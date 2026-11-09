@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-MURAJAAH - Sistem Rekod & Pemantauan Bacaan Iqra' / Al-Quran</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        emerald: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            800: '#065f46',
+                            900: '#064e3b',
+                        },
+                        amber: {
+                            500: '#f59e0b',
+                            600: '#d97706',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS (XLSX Import/Export) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- jsPDF & autoTable (PDF Export) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #1e293b; }
+        .tab-active { border-bottom: 3px solid #059669; color: #059669; font-weight: 600; }
+        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(226, 232, 240, 0.8); }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+
+    <!-- TOP HEADER / NAVBAR -->
+    <header class="bg-emerald-800 text-white shadow-lg sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo & App Title -->
+                <div class="flex items-center space-x-3">
+                    <div class="bg-white text-emerald-800 p-2 rounded-xl shadow-md flex items-center justify-center font-bold">
+                        <i data-lucide="book-open-check" class="w-6 h-6 text-emerald-700"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold tracking-wider leading-tight">Q-MURAJAAH</h1>
+                        <p class="text-xs text-emerald-200">Sistem Semakan Bacaan Iqra' & Al-Quran Tahun 2</p>
+                    </div>
+                </div>
+
+                <!-- Current Role Badge & Quick Switcher -->
+                <div class="flex items-center space-x-3">
+                    <div class="hidden sm:flex flex-col text-right">
+                        <span class="text-xs text-emerald-200" id="user-display-name">Pentadbir Utama</span>
+                        <span class="text-xs font-semibold uppercase tracking-wider text-amber-300" id="user-role-badge">ADMIN</span>
+                    </div>
+
+                    <!-- Role Selector Modal Switcher -->
+                    <select id="role-selector" onchange="switchRole(this.value)" class="bg-emerald-900 text-white text-xs sm:text-sm font-medium rounded-lg px-3 py-2 border border-emerald-700 focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer shadow-inner">
+                        <option value="admin">🔒 Mod Admin</option>
+                        <option value="guru">👨‍🏫 Mod Guru (Ustaz Ahmad)</option>
+                        <option value="ibubapa">👨‍👩‍👦 Mod Ibu Bapa (En. Razak)</option>
+                    </select>
+
+                    <button onclick="showModal('config-modal')" title="Konfigurasi Supabase / Vercel" class="p-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 transition text-white">
+                        <i data-lucide="settings" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow">
+        
+        <!-- ALERT BANNER FOR SYSTEM NOTIFICATIONS -->
+        <div id="toast-banner" class="hidden mb-4 p-4 rounded-xl shadow-sm text-sm font-medium flex items-center justify-between transition-all duration-300">
+            <div class="flex items-center space-x-2">
+                <i id="toast-icon" data-lucide="info" class="w-5 h-5"></i>
+                <span id="toast-message">Mesej sistem...</span>
+            </div>
+            <button onclick="hideToast()" class="text-gray-500 hover:text-gray-700"><i data-lucide="x" class="w-4 h-4"></i></button>
+        </div>
+
+        <!-- DASHBOARD CONTAINER (DYNAMICALLY LOADED BY ROLE) -->
+        <div id="app-viewport">
+            <!-- Dynamic Content Injected Here via Javascript -->
+        </div>
+
+    </main>
+
+    <!-- MODAL: ADD / SUBMIT RECORD (IBU BAPA) -->
+    <div id="modal-hantar-bacaan" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center hidden z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 relative animate-fadeIn">
+            <button onclick="closeModal('modal-hantar-bacaan')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+            <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2 mb-4">
+                <i data-lucide="plus-circle" class="text-emerald-600"></i> Rekod Bacaan Rumah Baru
+            </h3>
+            
+            <form id="form-bacaan-ibubapa" onsubmit="submitBacaanBaru(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Pilih Anak</label>
+                    <select id="input-bacaan-anak" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Kategori Bacaan</label>
+                        <select id="input-bacaan-kategori" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                            <option value="Iqra 1">Iqra' 1</option>
+                            <option value="Iqra 2">Iqra' 2</option>
+                            <option value="Iqra 3">Iqra' 3</option>
+                            <option value="Iqra 4">Iqra' 4</option>
+                            <option value="Iqra 5">Iqra' 5</option>
+                            <option value="Iqra 6">Iqra' 6</option>
+                            <option value="Al-Quran">Al-Quran</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">No. Muka Surat / Surah</label>
+                        <input type="text" id="input-bacaan-muka" placeholder="Contoh: M/S 14 atau Surah Al-Baqarah m/s 2" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Tarikh Bacaan</label>
+                    <input type="date" id="input-bacaan-tarikh" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Catatan Ibu Bapa (Opsional)</label>
+                    <textarea id="input-bacaan-catatan" rows="2" placeholder="Contoh: Masih keliru dengan sebutan Mad..." class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"></textarea>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-3">
+                    <button type="button" onclick="closeModal('modal-hantar-bacaan')" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Batal</button>
+                    <button type="submit" class="px-5 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg shadow">Hantar Rekod</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: GURU VERIFICATION & EVALUATION -->
+    <div id="modal-pengesahan-guru" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center hidden z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 relative">
+            <button onclick="closeModal('modal-pengesahan-guru')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+            <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2 mb-4">
+                <i data-lucide="check-square" class="text-emerald-600"></i> Semakan & Pengesahan Guru
+            </h3>
+
+            <div id="detail-bacaan-to-verify" class="bg-slate-50 p-4 rounded-xl text-sm mb-4 border border-slate-200">
+                <!-- Injected via JS -->
+            </div>
+
+            <form id="form-pengesahan-guru" onsubmit="simpanPengesahanGuru(event)" class="space-y-4">
+                <input type="hidden" id="verify-record-id">
+                
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-2">Penilaian Tahap Penguasaan</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="flex items-center p-3 border border-emerald-200 rounded-xl cursor-pointer hover:bg-emerald-50 transition">
+                            <input type="radio" name="tahap_penguasaan" value="LANCAR" checked class="text-emerald-600 focus:ring-emerald-500 h-4 w-4">
+                            <div class="ml-3">
+                                <span class="block text-sm font-bold text-emerald-800">LANCAR</span>
+                                <span class="block text-xs text-emerald-600">Boleh teruskan ke halaman berikutnya</span>
+                            </div>
+                        </label>
+                        <label class="flex items-center p-3 border border-amber-200 rounded-xl cursor-pointer hover:bg-amber-50 transition">
+                            <input type="radio" name="tahap_penguasaan" value="KURANG LANCAR" class="text-amber-600 focus:ring-amber-500 h-4 w-4">
+                            <div class="ml-3">
+                                <span class="block text-sm font-bold text-amber-800">KURANG LANCAR</span>
+                                <span class="block text-xs text-amber-600">Perlu diulang semula halaman ini</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Status Pengesahan</label>
+                    <select id="verify-status" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                        <option value="Disahkan">Disahkan</option>
+                        <option value="Perlu Pembetulan">Perlu Pembetulan</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Ulasan / Catatan Guru</label>
+                    <textarea id="verify-komen" rows="3" placeholder="Sila perhatikan makhraj huruf Ra' dan sebutan panjang 2 harakat..." class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" required></textarea>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-3">
+                    <button type="button" onclick="closeModal('modal-pengesahan-guru')" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Batal</button>
+                    <button type="submit" class="px-5 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg shadow">Simpan Pengesahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: EXCEL IMPORT PREVIEW & VALIDATION -->
+    <div id="modal-import-excel" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center hidden z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full p-6 relative max-h-[90vh] flex flex-col">
+            <button onclick="closeModal('modal-import-excel')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+            <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2 mb-2">
+                <i data-lucide="file-spreadsheet" class="text-emerald-600"></i> Import Data Excel Pukal (Bulk Import)
+            </h3>
+            <p class="text-xs text-gray-500 mb-4">Pilih jenis data yang hendak diimport, muat naik fail .xlsx / .csv, dan semak validasi sebelum disimpan ke pangkalan data.</p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                <select id="excel-import-type" class="border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                    <option value="murid">Import Data Murid</option>
+                    <option value="guru">Import Data Guru</option>
+                    <option value="ibubapa">Import Data Ibu Bapa</option>
+                </select>
+                <div class="sm:col-span-2 flex gap-2">
+                    <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" class="block w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer">
+                    <button onclick="downloadExcelTemplate()" class="px-3 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg whitespace-nowrap flex items-center gap-1">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i> Templat
+                    </button>
+                </div>
+            </div>
+
+            <!-- Validation Result Box -->
+            <div id="import-preview-summary" class="hidden mb-3 p-3 rounded-lg text-xs font-semibold"></div>
+
+            <div class="overflow-y-auto flex-grow border border-gray-200 rounded-xl mb-4">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-gray-100 text-gray-600 sticky top-0">
+                        <tr id="excel-preview-thead">
+                            <th class="p-2.5">Sila muat naik fail Excel untuk melihat pratonton data.</th>
+                        </tr>
+                    </thead>
+                    <tbody id="excel-preview-tbody" class="divide-y divide-gray-200">
+                        <!-- Preview rows injected JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="flex justify-between items-center pt-2">
+                <span class="text-xs text-gray-500" id="excel-record-count">0 Rekod Dikesan</span>
+                <div class="space-x-2">
+                    <button onclick="closeModal('modal-import-excel')" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Batal</button>
+                    <button id="btn-confirm-import" onclick="executeExcelImport()" disabled class="px-5 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-medium rounded-lg shadow">Simpan Ke Pangkalan Data</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CONFIGURATION & SUPABASE SETTINGS -->
+    <div id="config-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center hidden z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative">
+            <button onclick="closeModal('config-modal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+            <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2 mb-3">
+                <i data-lucide="server" class="text-emerald-600"></i> Integrasi Supabase & Vercel
+            </h3>
+            <p class="text-xs text-gray-500 mb-4">Aplikasi ini beroperasi dalam mod simulasi berserta persediaan sambungan Supabase berskala penuh.</p>
+
+            <div class="space-y-3 text-sm">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">SUPABASE URL</label>
+                    <input type="text" id="cfg-supabase-url" placeholder="https://xyzcompany.supabase.co" class="w-full border border-gray-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-emerald-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">SUPABASE ANON KEY</label>
+                    <input type="password" id="cfg-supabase-key" placeholder="eyJhYmdj... (Anon Key)" class="w-full border border-gray-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-emerald-500 outline-none">
+                </div>
+                <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-xs text-emerald-800">
+                    <p class="font-semibold mb-1">✨ Vercel Deployment Ready:</p>
+                    <p>Pembolehubah persekitaran (Environment Variables) boleh ditetapkan di platform Vercel menggunakan <code>NEXT_PUBLIC_SUPABASE_URL</code> & <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>.</p>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-4">
+                <button onclick="closeModal('config-modal')" class="px-4 py-2 text-xs text-gray-600 hover:bg-gray-100 rounded-lg">Tutup</button>
+                <button onclick="saveSupabaseConfig()" class="px-4 py-2 text-xs bg-emerald-600 text-white font-medium rounded-lg">Simpan Tetapan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="bg-white border-t border-slate-200 py-4 mt-8">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500">
+            <p>© 2026 Q-MURAJAAH - Sistem Pemantauan Bacaan Iqra' & Al-Quran Tahun 2. Hak Cipta Terelihara.</p>
+        </div>
+    </footer>
+
+    <!-- SCRIPT UTAMA PERMOHONAN & LOGIK PANGKALAN DATA SIMULASI -->
+    <script>
+        // ==========================================
+        // 1. DATA INITIALIZATION & LOCAL STORAGE STATE
+        // ==========================================
+        
+        const SEED_MURID = [
+            { id: 'M001', nama: 'Muhammad Amirul Bin Razak', mykid: '170312-08-1123', id_delima: 'm-12345678@moe-dl.edu.my', kelas: '2 BESTARI', id_guru: 'G001', nama_guru: 'Ustaz Ahmad', nama_ibubapa: 'Encik Razak', tel_ibubapa: '012-3456789' },
+            { id: 'M002', nama: 'Nur Aisyah Binti Usman', mykid: '170520-10-5432', id_delima: 'm-87654321@moe-dl.edu.my', kelas: '2 BESTARI', id_guru: 'G001', nama_guru: 'Ustaz Ahmad', nama_ibubapa: 'Encik Usman', tel_ibubapa: '019-8765432' },
+            { id: 'M003', nama: 'Ahmad Daniel Bin Zulkifli', mykid: '170104-02-3344', id_delima: 'm-99887766@moe-dl.edu.my', kelas: '2 CEKAL', id_guru: 'G002', nama_guru: 'Ustazah Fatimah', nama_ibubapa: 'Encik Zulkifli', tel_ibubapa: '013-1122334' },
+            { id: 'M004', nama: 'Siti Sarah Binti Mokhtar', mykid: '170811-08-9988', id_delima: 'm-55443322@moe-dl.edu.my', kelas: '2 CEKAL', id_guru: 'G002', nama_guru: 'Ustazah Fatimah', nama_ibubapa: 'Puan Mokhtar', tel_ibubapa: '014-9988776' }
+        ];
+
+        const SEED_GURU = [
+            { id: 'G001', nama: 'Ustaz Ahmad Bin Hassan', email: 'ahmad@moe-dl.edu.my', kelas: '2 BESTARI', status: 'Aktif' },
+            { id: 'G002', nama: 'Ustazah Fatimah Binti Ismail', email: 'fatimah@moe-dl.edu.my', kelas: '2 CEKAL', status: 'Aktif' }
+        ];
+
+        const SEED_IBUBAPA = [
+            { id: 'P001', nama: 'Encik Razak Bin Idris', id_delima_anak: 'm-12345678@moe-dl.edu.my', nama_anak: 'Muhammad Amirul Bin Razak', email: 'razak@gmail.com', tel: '012-3456789', hubungan: 'Bapa' },
+            { id: 'P002', nama: 'Encik Usman Bin Ali', id_delima_anak: 'm-87654321@moe-dl.edu.my', nama_anak: 'Nur Aisyah Binti Usman', email: 'usman@gmail.com', tel: '019-8765432', hubungan: 'Bapa' }
+        ];
+
+        const SEED_REKOD_BACAAN = [
+            { id: 'R101', id_murid: 'M001', nama_murid: 'Muhammad Amirul Bin Razak', kategori: 'Iqra 3', muka_surat: 'M/S 12', tarikh: '2026-11-01', status: 'Disahkan', tahap: 'LANCAR', komen_guru: 'Bacaan tajwid baik, boleh teruskan m/s 13.', tarikh_hantar: '2026-11-01', catatan_ibubapa: 'Dua kali bacaan malam semalam.' },
+            { id: 'R102', id_murid: 'M001', nama_murid: 'Muhammad Amirul Bin Razak', kategori: 'Iqra 3', muka_surat: 'M/S 13', tarikh: '2026-11-05', status: 'Disahkan', tahap: 'KURANG LANCAR', komen_guru: 'Sila ulang m/s 13. Keliru sebutan huruf Ain dan Hamzah.', tarikh_hantar: '2026-11-05', catatan_ibubapa: 'Kurang fokus sedikit.' },
+            { id: 'R103', id_murid: 'M001', nama_murid: 'Muhammad Amirul Bin Razak', kategori: 'Iqra 3', muka_surat: 'M/S 13', tarikh: '2026-11-07', status: 'Disahkan', tahap: 'LANCAR', komen_guru: 'Alhamdulillah, ulangan m/s 13 kini sudah lancar!', tarikh_hantar: '2026-11-07', catatan_ibubapa: 'Sudah diulang 3 kali.' },
+            { id: 'R104', id_murid: 'M001', nama_murid: 'Muhammad Amirul Bin Razak', kategori: 'Iqra 3', muka_surat: 'M/S 14', tarikh: '2026-11-09', status: 'Menunggu Pengesahan', tahap: '-', komen_guru: '', tarikh_hantar: '2026-11-09', catatan_ibubapa: 'Sudah dibaca bersama ibu.' },
+            { id: 'R105', id_murid: 'M002', nama_murid: 'Nur Aisyah Binti Usman', kategori: 'Iqra 5', muka_surat: 'M/S 20', tarikh: '2026-11-08', status: 'Disahkan', tahap: 'LANCAR', komen_guru: 'Sangat baik dan fasih.', tarikh_hantar: '2026-11-08', catatan_ibubapa: 'Lancar.' },
+            { id: 'R106', id_murid: 'M003', nama_murid: 'Ahmad Daniel Bin Zulkifli', kategori: 'Iqra 1', muka_surat: 'M/S 5', tarikh: '2026-11-08', status: 'Menunggu Pengesahan', tahap: '-', komen_guru: '', tarikh_hantar: '2026-11-08', catatan_ibubapa: 'Membaca surah pendek.' }
+        ];
+
+        // Store App Data in Memory
+        let currentRole = 'admin'; // 'admin', 'guru', 'ibubapa'
+        let dbMurid = JSON.parse(localStorage.getItem('qm_murid')) || SEED_MURID;
+        let dbGuru = JSON.parse(localStorage.getItem('qm_guru')) || SEED_GURU;
+        let dbIbubapa = JSON.parse(localStorage.getItem('qm_ibubapa')) || SEED_IBUBAPA;
+        let dbRekod = JSON.parse(localStorage.getItem('qm_rekod')) || SEED_REKOD_BACAAN;
+
+        let parsedExcelData = [];
+
+        function saveToStorage() {
+            localStorage.setItem('qm_murid', JSON.stringify(dbMurid));
+            localStorage.setItem('qm_guru', JSON.stringify(dbGuru));
+            localStorage.setItem('qm_ibubapa', JSON.stringify(dbIbubapa));
+            localStorage.setItem('qm_rekod', JSON.stringify(dbRekod));
+        }
+
+        // ==========================================
+        // 2. CORE APPLICATION LOGIC & CALCULATIONS
+        // ==========================================
+
+        /**
+         * Calculates Official Mastery Rate according to strict guidelines:
+         * Unique Verified "LANCAR" pages divided by Total Unique Assessed Pages.
+         */
+        function calculateMuridMastery(muridId) {
+            const muridRekod = dbRekod.filter(r => r.id_murid === muridId && r.status === 'Disahkan');
+            
+            if (muridRekod.length === 0) {
+                return { lancarUnik: 0, totalUnik: 0, peratus: 0, statusUlang: 'Tiada Rekod' };
+            }
+
+            // Map unique pages and their latest verified status
+            const uniquePages = {};
+            muridRekod.forEach(r => {
+                const key = `${r.kategori}-${r.muka_surat.toLowerCase().trim()}`;
+                // Keep overwrite with latest record evaluation
+                uniquePages[key] = r.tahap;
+            });
+
+            const totalUnik = Object.keys(uniquePages).length;
+            const lancarUnik = Object.values(uniquePages).filter(t => t === 'LANCAR').length;
+            const peratus = totalUnik > 0 ? Math.round((lancarUnik / totalUnik) * 100) : 0;
+
+            return { lancarUnik, totalUnik, peratus };
+        }
+
+        function switchRole(role) {
+            currentRole = role;
+            const badge = document.getElementById('user-role-badge');
+            const nameDisplay = document.getElementById('user-display-name');
+
+            if (role === 'admin') {
+                badge.innerText = 'ADMIN';
+                badge.className = 'text-xs font-semibold uppercase tracking-wider text-amber-300';
+                nameDisplay.innerText = 'Pentadbir Utama';
+            } else if (role === 'guru') {
+                badge.innerText = 'GURU';
+                badge.className = 'text-xs font-semibold uppercase tracking-wider text-blue-300';
+                nameDisplay.innerText = 'Ustaz Ahmad (2 BESTARI)';
+            } else if (role === 'ibubapa') {
+                badge.innerText = 'IBU BAPA';
+                badge.className = 'text-xs font-semibold uppercase tracking-wider text-emerald-300';
+                nameDisplay.innerText = 'Encik Razak (Bapa Amirul)';
+            }
+
+            renderViewport();
+            showToast(`Bertukar ke peranan: ${role.toUpperCase()}`, 'info');
+        }
+
+        // ==========================================
+        // 3. UI RENDER ENGINE
+        // ==========================================
+
+        function renderViewport() {
+            const viewport = document.getElementById('app-viewport');
+
+            if (currentRole === 'admin') {
+                viewport.innerHTML = getAdminDashboardHTML();
+                initAdminCharts();
+            } else if (currentRole === 'guru') {
+                viewport.innerHTML = getGuruDashboardHTML();
+                initGuruCharts();
+            } else if (currentRole === 'ibubapa') {
+                viewport.innerHTML = getIbubapaDashboardHTML();
+            }
+
+            lucide.createIcons();
+        }
+
+        // ---------------- ADMIN DASHBOARD VIEW ----------------
+        function getAdminDashboardHTML() {
+            const totalMurid = dbMurid.length;
+            const totalGuru = dbGuru.length;
+            const totalIbubapa = dbIbubapa.length;
+            const totalRekod = dbRekod.length;
+            const totalDisahkan = dbRekod.filter(r => r.status === 'Disahkan').length;
+            const totalPending = dbRekod.filter(r => r.status === 'Menunggu Pengesahan').length;
+
+            return `
+                <div class="space-y-6">
+                    <!-- Top Action Bar -->
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 glass-card p-5 rounded-2xl shadow-sm">
+                        <div>
+                            <h2 class="text-xl font-bold text-slate-800">Panel Pentadbiran Utama (Admin)</h2>
+                            <p class="text-xs text-slate-500">Kawalan penuh pangkalan data, import/eksport Excel, dan pemantauan real-time sekolah.</p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="openImportExcelModal()" class="px-4 py-2 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow flex items-center gap-1.5 transition">
+                                <i data-lucide="file-up" class="w-4 h-4"></i> Import Excel Pukal
+                            </button>
+                            <button onclick="exportOverallSchoolExcel()" class="px-4 py-2 text-xs bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-xl shadow flex items-center gap-1.5 transition">
+                                <i data-lucide="file-down" class="w-4 h-4"></i> Eksport Excel
+                            </button>
+                            <button onclick="generatePDFReport('sekolah')" class="px-4 py-2 text-xs bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl shadow flex items-center gap-1.5 transition">
+                                <i data-lucide="file-text" class="w-4 h-4"></i> Laporan PDF Sekolah
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Metrics Stats Grid -->
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <p class="text-xs font-semibold text-slate-500 uppercase">Jumlah Murid</p>
+                            <h3 class="text-2xl font-bold text-emerald-600 mt-1">${totalMurid}</h3>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <p class="text-xs font-semibold text-slate-500 uppercase">Jumlah Guru</p>
+                            <h3 class="text-2xl font-bold text-blue-600 mt-1">${totalGuru}</h3>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <p class="text-xs font-semibold text-slate-500 uppercase">Ibu Bapa</p>
+                            <h3 class="text-2xl font-bold text-purple-600 mt-1">${totalIbubapa}</h3>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <p class="text-xs font-semibold text-slate-500 uppercase">Rekod Bacaan</p>
+                            <h3 class="text-2xl font-bold text-slate-700 mt-1">${totalRekod}</h3>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <p class="text-xs font-semibold text-slate-500 uppercase">Telah Disahkan</p>
+                            <h3 class="text-2xl font-bold text-emerald-700 mt-1">${totalDisahkan}</h3>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <p class="text-xs font-semibold text-slate-500 uppercase">Pending</p>
+                            <h3 class="text-2xl font-bold text-amber-500 mt-1">${totalPending}</h3>
+                        </div>
+                    </div>
+
+                    <!-- Charts Row -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                            <h4 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <i data-lucide="bar-chart-3" class="text-emerald-600"></i> Analytics Penguasaan Bacaan Mengikut Kelas
+                            </h4>
+                            <div class="h-64">
+                                <canvas id="chart-penguasaan-kelas"></canvas>
+                            </div>
+                        </div>
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                            <h4 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <i data-lucide="pie-chart" class="text-emerald-600"></i> Taburan Tahap Penguasaan Disahkan
+                            </h4>
+                            <div class="h-64 flex justify-center">
+                                <canvas id="chart-pie-tahap"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Management Tabs Section -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="border-b border-slate-200 flex px-6 pt-3 gap-6 text-sm">
+                            <button class="pb-3 tab-active">Pengurusan Senarai Murid</button>
+                        </div>
+                        <div class="p-5 overflow-x-auto">
+                            <table class="w-full text-left text-xs text-slate-600">
+                                <thead class="bg-slate-100 text-slate-700 uppercase font-semibold">
+                                    <tr>
+                                        <th class="p-3">Nama Murid</th>
+                                        <th class="p-3">ID DELIMa</th>
+                                        <th class="p-3">Kelas</th>
+                                        <th class="p-3">Guru Pembimbing</th>
+                                        <th class="p-3">Ibu Bapa</th>
+                                        <th class="p-3 text-center">Penguasaan Rasmi</th>
+                                        <th class="p-3 text-right">Tindakan</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200">
+                                    ${dbMurid.map(m => {
+                                        const stats = calculateMuridMastery(m.id);
+                                        return `
+                                            <tr class="hover:bg-slate-50 transition">
+                                                <td class="p-3 font-semibold text-slate-800">${m.nama}</td>
+                                                <td class="p-3">${m.id_delima}</td>
+                                                <td class="p-3"><span class="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-md font-semibold text-[10px]">${m.kelas}</span></td>
+                                                <td class="p-3">${m.nama_guru}</td>
+                                                <td class="p-3">${m.nama_ibubapa}</td>
+                                                <td class="p-3 text-center">
+                                                    <span class="font-bold ${stats.peratus >= 70 ? 'text-emerald-600' : 'text-amber-600'}">${stats.peratus}%</span>
+                                                    <span class="text-[10px] text-slate-400 block">(${stats.lancarUnik}/${stats.totalUnik} m/s)</span>
+                                                </td>
+                                                <td class="p-3 text-right">
+                                                    <button onclick="generatePDFReport('murid', '${m.id}')" class="text-red-600 hover:text-red-800 font-semibold text-xs flex items-center justify-end gap-1">
+                                                        <i data-lucide="file-text" class="w-3.5 h-3.5"></i> PDF
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ---------------- GURU DASHBOARD VIEW ----------------
+        function getGuruDashboardHTML() {
+            // Filter murid for Ustaz Ahmad (2 BESTARI)
+            const muridSeliaan = dbMurid.filter(m => m.kelas === '2 BESTARI');
+            const pendingVerifications = dbRekod.filter(r => {
+                const murid = dbMurid.find(m => m.id === r.id_murid);
+                return murid && murid.kelas === '2 BESTARI' && r.status === 'Menunggu Pengesahan';
+            });
+
+            return `
+                <div class="space-y-6">
+                    <!-- Top Action Bar -->
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 glass-card p-5 rounded-2xl shadow-sm">
+                        <div>
+                            <h2 class="text-xl font-bold text-slate-800">Panel Guru Kelas (2 BESTARI)</h2>
+                            <p class="text-xs text-slate-500">Semak rekod bacaan dari rumah, tentukan tahap penguasaan, dan pantau anak murid.</p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="exportClassExcel('2 BESTARI')" class="px-4 py-2 text-xs bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-xl shadow flex items-center gap-1.5 transition">
+                                <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Eksport Excel Kelas
+                            </button>
+                            <button onclick="generatePDFReport('kelas', '2 BESTARI')" class="px-4 py-2 text-xs bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl shadow flex items-center gap-1.5 transition">
+                                <i data-lucide="file-text" class="w-4 h-4"></i> Laporan PDF Kelas
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Pending Verification Alerts -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <i data-lucide="clock" class="text-amber-500"></i> Rekod Bacaan Menunggu Pengesahan Guru 
+                                <span class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-xs">${pendingVerifications.length}</span>
+                            </h3>
+                        </div>
+
+                        ${pendingVerifications.length === 0 ? `
+                            <div class="text-center py-6 text-slate-400 text-xs">
+                                <i data-lucide="check-circle-2" class="w-8 h-8 mx-auto mb-2 text-emerald-500"></i>
+                                Semua rekod bacaan telah disemak dan disahkan.
+                            </div>
+                        ` : `
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs text-slate-600">
+                                    <thead class="bg-amber-50 text-amber-900 font-semibold uppercase">
+                                        <tr>
+                                            <th class="p-3">Nama Murid</th>
+                                            <th class="p-3">Kategori</th>
+                                            <th class="p-3">Muka Surat</th>
+                                            <th class="p-3">Tarikh Dibaca</th>
+                                            <th class="p-3">Catatan Ibu Bapa</th>
+                                            <th class="p-3 text-right">Tindakan</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        ${pendingVerifications.map(r => `
+                                            <tr class="hover:bg-amber-50/50">
+                                                <td class="p-3 font-semibold text-slate-800">${r.nama_murid}</td>
+                                                <td class="p-3 font-semibold text-emerald-700">${r.kategori}</td>
+                                                <td class="p-3">${r.muka_surat}</td>
+                                                <td class="p-3">${r.tarikh}</td>
+                                                <td class="p-3 italic text-slate-500">${r.catatan_ibubapa || '-'}</td>
+                                                <td class="p-3 text-right">
+                                                    <button onclick="openPengesahanModal('${r.id}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg text-xs shadow flex items-center gap-1 ml-auto">
+                                                        <i data-lucide="check-square" class="w-3.5 h-3.5"></i> Semak & Sahkan
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        `}
+                    </div>
+
+                    <!-- List of Controlled Students -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+                        <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <i data-lucide="users" class="text-emerald-600"></i> Senarai Murid Seliaan (2 BESTARI)
+                        </h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs text-slate-600">
+                                <thead class="bg-slate-100 text-slate-700 font-semibold uppercase">
+                                    <tr>
+                                        <th class="p-3">Nama Murid</th>
+                                        <th class="p-3">ID DELIMa</th>
+                                        <th class="p-3">Halaman Unik Dikuasai</th>
+                                        <th class="p-3">Peratus Penguasaan Rasmi</th>
+                                        <th class="p-3">Laporan Individual</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200">
+                                    ${muridSeliaan.map(m => {
+                                        const stats = calculateMuridMastery(m.id);
+                                        return `
+                                            <tr class="hover:bg-slate-50">
+                                                <td class="p-3 font-semibold text-slate-800">${m.nama}</td>
+                                                <td class="p-3 text-slate-500">${m.id_delima}</td>
+                                                <td class="p-3 font-semibold text-emerald-700">${stats.lancarUnik} daripada ${stats.totalUnik} halaman</td>
+                                                <td class="p-3">
+                                                    <div class="w-full bg-slate-100 rounded-full h-2.5 max-w-[120px] inline-block mr-2">
+                                                        <div class="bg-emerald-600 h-2.5 rounded-full" style="width: ${stats.peratus}%"></div>
+                                                    </div>
+                                                    <span class="font-bold text-slate-700">${stats.peratus}%</span>
+                                                </td>
+                                                <td class="p-3">
+                                                    <button onclick="generatePDFReport('murid', '${m.id}')" class="text-red-600 hover:text-red-800 font-medium flex items-center gap-1">
+                                                        <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Cetak Laporan PDF
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ---------------- IBU BAPA DASHBOARD VIEW ----------------
+        function getIbubapaDashboardHTML() {
+            const anakId = 'M001'; // Simulated logged-in parent child
+            const anak = dbMurid.find(m => m.id === anakId);
+            const rekodAnak = dbRekod.filter(r => r.id_murid === anakId);
+            const stats = calculateMuridMastery(anakId);
+
+            const lastVerifiedRecord = rekodAnak.filter(r => r.status === 'Disahkan').slice(-1)[0];
+
+            return `
+                <div class="space-y-6">
+                    <!-- Child Summary Header -->
+                    <div class="bg-gradient-to-r from-emerald-800 to-emerald-600 text-white p-6 rounded-3xl shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <span class="px-3 py-1 bg-white/20 rounded-full text-xs font-semibold tracking-wider uppercase">Portal Ibu Bapa / Penjaga</span>
+                            <h2 class="text-2xl font-bold mt-2">${anak.nama}</h2>
+                            <p class="text-xs text-emerald-100 mt-1">Kelas: ${anak.kelas} | Guru Pembimbing: ${anak.nama_guru}</p>
+                        </div>
+                        <button onclick="openModal('modal-hantar-bacaan')" class="px-5 py-3 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold rounded-2xl shadow-lg transition flex items-center gap-2">
+                            <i data-lucide="plus-circle" class="w-5 h-5"></i> Rekod Bacaan Hari Ini
+                        </button>
+                    </div>
+
+                    <!-- Progress Indicator -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                            <div class="p-3 bg-emerald-100 text-emerald-700 rounded-xl">
+                                <i data-lucide="book-open" class="w-7 h-7"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-500 font-semibold uppercase">Bacaan Terakhir Disahkan</p>
+                                <h4 class="text-lg font-bold text-slate-800">${lastVerifiedRecord ? `${lastVerifiedRecord.kategori} (${lastVerifiedRecord.muka_surat})` : 'Belum Ada'}</h4>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                            <div class="p-3 bg-blue-100 text-blue-700 rounded-xl">
+                                <i data-lucide="award" class="w-7 h-7"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-500 font-semibold uppercase">Penguasaan Rasmi</p>
+                                <h4 class="text-lg font-bold text-slate-800">${stats.peratus}% <span class="text-xs text-slate-400 font-normal">(${stats.lancarUnik} halaman)</span></h4>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                            <div class="p-3 bg-amber-100 text-amber-700 rounded-xl">
+                                <i data-lucide="send" class="w-7 h-7"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-500 font-semibold uppercase">Jumlah Rekod Dihantar</p>
+                                <h4 class="text-lg font-bold text-slate-800">${rekodAnak.length} Rekod</h4>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- History of Submissions -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+                        <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <i data-lucide="history" class="text-emerald-600"></i> Sejarah Bacaan & Status Semakan Guru
+                        </h3>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs text-slate-600">
+                                <thead class="bg-slate-100 text-slate-700 font-semibold uppercase">
+                                    <tr>
+                                        <th class="p-3">Tarikh</th>
+                                        <th class="p-3">Kategori</th>
+                                        <th class="p-3">Muka Surat</th>
+                                        <th class="p-3">Status Pengesahan</th>
+                                        <th class="p-3">Penilaian Guru</th>
+                                        <th class="p-3">Komen / Catatan Guru</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200">
+                                    ${rekodAnak.reverse().map(r => `
+                                        <tr class="hover:bg-slate-50">
+                                            <td class="p-3 text-slate-500">${r.tarikh}</td>
+                                            <td class="p-3 font-semibold text-emerald-700">${r.kategori}</td>
+                                            <td class="p-3 font-medium">${r.muka_surat}</td>
+                                            <td class="p-3">
+                                                ${r.status === 'Disahkan' ? '<span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-semibold rounded-full text-[10px]">Disahkan</span>' :
+                                                  r.status === 'Perlu Pembetulan' ? '<span class="px-2.5 py-1 bg-red-100 text-red-800 font-semibold rounded-full text-[10px]">Perlu Pembetulan</span>' :
+                                                  '<span class="px-2.5 py-1 bg-amber-100 text-amber-800 font-semibold rounded-full text-[10px]">Menunggu Pengesahan</span>'}
+                                            </td>
+                                            <td class="p-3 font-bold">
+                                                ${r.tahap === 'LANCAR' ? '<span class="text-emerald-600">LANCAR</span>' :
+                                                  r.tahap === 'KURANG LANCAR' ? '<span class="text-amber-600">KURANG LANCAR (ULANG)</span>' : '-'}
+                                            </td>
+                                            <td class="p-3 italic text-slate-600">${r.komen_guru || 'Tiada komen lagi.'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==========================================
+        // 4. EXCEL IMPORT & VALIDATION MODULE
+        // ==========================================
+
+        function openImportExcelModal() {
+            openModal('modal-import-excel');
+            document.getElementById('excel-file-input').value = '';
+            document.getElementById('excel-preview-thead').innerHTML = '<th class="p-2.5">Sila muat naik fail Excel untuk melihat pratonton data.</th>';
+            document.getElementById('excel-preview-tbody').innerHTML = '';
+            document.getElementById('excel-record-count').innerText = '0 Rekod Dikesan';
+            document.getElementById('btn-confirm-import').disabled = true;
+            document.getElementById('import-preview-summary').className = 'hidden';
+            parsedExcelData = [];
+        }
+
+        document.getElementById('excel-file-input').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                    processExcelPreview(json);
+                } catch (err) {
+                    showToast('Ralat membaca fail Excel! Sila pastikan format sah.', 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        function processExcelPreview(rows) {
+            if (rows.length < 2) {
+                showToast('Fail Excel kosong atau tiada tajuk lajur!', 'error');
+                return;
+            }
+
+            const headers = rows[0];
+            const dataRows = rows.slice(1).filter(r => r.length > 0);
+            const importType = document.getElementById('excel-import-type').value;
+
+            // Render Table Header
+            let theadHTML = '';
+            headers.forEach(h => theadHTML += `<th class="p-2 text-slate-700">${h}</th>`);
+            theadHTML += '<th class="p-2 text-right">Status Validasi</th>';
+            document.getElementById('excel-preview-thead').innerHTML = theadHTML;
+
+            let tbodyHTML = '';
+            let validCount = 0;
+            let invalidCount = 0;
+            parsedExcelData = [];
+
+            dataRows.forEach((row, idx) => {
+                let isValid = true;
+                let errorMsg = '';
+
+                // Simple Field Validation Check
+                if (importType === 'murid') {
+                    const nama = row[1] || '';
+                    const delima = row[3] || '';
+                    if (!nama || !delima) {
+                        isValid = false;
+                        errorMsg = 'Nama / ID DELIMa Kosong';
+                    } else if (dbMurid.some(m => m.id_delima === delima)) {
+                        isValid = false;
+                        errorMsg = 'ID DELIMa Berulang';
+                    }
+                }
+
+                if (isValid) validCount++; else invalidCount++;
+
+                tbodyHTML += `<tr class="${isValid ? 'hover:bg-slate-50' : 'bg-red-50 hover:bg-red-100'}">`;
+                row.forEach(cell => tbodyHTML += `<td class="p-2">${cell || ''}</td>`);
+                tbodyHTML += `<td class="p-2 text-right font-semibold ${isValid ? 'text-emerald-600' : 'text-red-600'}">
+                    ${isValid ? '✓ Sah' : `✕ Ralat: ${errorMsg}`}
+                </td></tr>`;
+
+                parsedExcelData.push({ row, isValid });
+            });
+
+            document.getElementById('excel-preview-tbody').innerHTML = tbodyHTML;
+            document.getElementById('excel-record-count').innerText = `${dataRows.length} Rekod Dikesan (${validCount} Sah, ${invalidCount} Ralat)`;
+
+            const summaryBox = document.getElementById('import-preview-summary');
+            summaryBox.classList.remove('hidden');
+            if (invalidCount === 0) {
+                summaryBox.className = 'mb-3 p-3 rounded-lg text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200';
+                summaryBox.innerText = `✅ Semua ${validCount} rekod disahkan betul dan sedia untuk diimport.`;
+                document.getElementById('btn-confirm-import').disabled = false;
+            } else {
+                summaryBox.className = 'mb-3 p-3 rounded-lg text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200';
+                summaryBox.innerText = `⚠️ Terdapat ${invalidCount} rekod bermasalah/berulang. Hanya rekod sah yang akan disimpan.`;
+                document.getElementById('btn-confirm-import').disabled = false;
+            }
+        }
+
+        function executeExcelImport() {
+            const importType = document.getElementById('excel-import-type').value;
+            let importedCount = 0;
+
+            parsedExcelData.forEach(item => {
+                if (item.isValid) {
+                    const r = item.row;
+                    if (importType === 'murid') {
+                        dbMurid.push({
+                            id: 'M' + Math.floor(1000 + Math.random() * 9000),
+                            nama: r[1],
+                            mykid: r[2] || '-',
+                            id_delima: r[3],
+                            kelas: r[4] || '2 BESTARI',
+                            nama_guru: r[5] || 'Ustaz Ahmad',
+                            nama_ibubapa: r[6] || '-',
+                            tel_ibubapa: r[7] || '-'
+                        });
+                    }
+                    importedCount++;
+                }
+            });
+
+            saveToStorage();
+            closeModal('modal-import-excel');
+            showToast(`Berjaya mengimport ${importedCount} rekod ke dalam Supabase / pangkalan data.`, 'success');
+            renderViewport();
+        }
+
+        function downloadExcelTemplate() {
+            const templateType = document.getElementById('excel-import-type').value;
+            let headers = [];
+            let sampleRow = [];
+
+            if (templateType === 'murid') {
+                headers = ['Bil', 'Nama Penuh Murid', 'Nombor MyKid', 'ID DELIMa', 'Kelas', 'Nama Guru', 'Nama Ibu Bapa', 'Nombor Telefon Ibu Bapa'];
+                sampleRow = [1, 'Muhammad Ali Bin Ahmad', '170202-08-1234', 'm-11223344@moe-dl.edu.my', '2 BESTARI', 'Ustaz Ahmad', 'Encik Ahmad', '012-9988776'];
+            }
+
+            const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Templat_Import');
+            XLSX.writeFile(wb, `Templat_QMurajaah_${templateType.toUpperCase()}.xlsx`);
+        }
+
+        // ==========================================
+        // 5. EXCEL & PDF REPORT GENERATION MODULE
+        // ==========================================
+
+        function exportOverallSchoolExcel() {
+            const data = dbMurid.map((m, idx) => {
+                const stats = calculateMuridMastery(m.id);
+                return {
+                    'Bil': idx + 1,
+                    'Nama Murid': m.nama,
+                    'ID DELIMa': m.id_delima,
+                    'Kelas': m.kelas,
+                    'Guru Pembimbing': m.nama_guru,
+                    'Halaman Unik Dikuasai': stats.lancarUnik,
+                    'Jumlah Halaman Dinilai': stats.totalUnik,
+                    'Peratus Penguasaan (%)': stats.peratus + '%'
+                };
+            });
+
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Pencapaian_Sekolah');
+            XLSX.writeFile(wb, `Laporan_QMurajaah_Keseluruhan_Sekolah.xlsx`);
+        }
+
+        function exportClassExcel(kelas) {
+            const muridKelas = dbMurid.filter(m => m.kelas === kelas);
+            const data = muridKelas.map((m, idx) => {
+                const stats = calculateMuridMastery(m.id);
+                return {
+                    'Bil': idx + 1,
+                    'Nama Murid': m.nama,
+                    'ID DELIMa': m.id_delima,
+                    'Peratus Penguasaan': stats.peratus + '%',
+                    'Halaman Dikuasai': stats.lancarUnik
+                };
+            });
+
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, `Kelas_${kelas}`);
+            XLSX.writeFile(wb, `Laporan_QMurajaah_Kelas_${kelas}.xlsx`);
+        }
+
+        function generatePDFReport(type, targetId) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // Header Rasmi PDF
+            doc.setFillColor(5, 150, 105); // Emerald Green
+            doc.rect(0, 0, 210, 25, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(16);
+            doc.text('Q-MURAJAAH: LAPORAN PENGUASAAN BACAAN', 14, 16);
+
+            doc.setFontSize(10);
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Tarikh Dijana: ${new Date().toLocaleDateString('ms-MY')}`, 14, 32);
+
+            if (type === 'murid') {
+                const murid = dbMurid.find(m => m.id === targetId);
+                const stats = calculateMuridMastery(targetId);
+                const rekodVerified = dbRekod.filter(r => r.id_murid === targetId && r.status === 'Disahkan');
+
+                doc.setTextColor(0, 0, 0);
+                doc.setFontSize(12);
+                doc.text(`Profil Murid: ${murid.nama}`, 14, 42);
+                doc.setFontSize(10);
+                doc.text(`Kelas: ${murid.kelas}  |  ID DELIMa: ${murid.id_delima}`, 14, 48);
+                doc.text(`Peratus Penguasaan Rasmi: ${stats.peratus}% (${stats.lancarUnik}/${stats.totalUnik} halaman dikuasai)`, 14, 54);
+
+                const tableRows = rekodVerified.map(r => [
+                    r.tarikh, r.kategori, r.muka_surat, r.tahap, r.komen_guru || '-'
+                ]);
+
+                doc.autoTable({
+                    startY: 60,
+                    head: [['Tarikh', 'Kategori', 'Muka Surat', 'Tahap Penguasaan', 'Catatan Guru']],
+                    body: tableRows,
+                    theme: 'striped',
+                    headStyles: { fillStyle: [5, 150, 105] }
+                });
+
+                doc.save(`Laporan_QMurajaah_${murid.nama}.pdf`);
+            } else if (type === 'sekolah') {
+                doc.setTextColor(0, 0, 0);
+                doc.setFontSize(12);
+                doc.text('Laporan Pencapaian Keseluruhan Sekolah (Tahun 2)', 14, 42);
+
+                const tableRows = dbMurid.map((m, idx) => {
+                    const stats = calculateMuridMastery(m.id);
+                    return [idx + 1, m.nama, m.kelas, m.nama_guru, `${stats.peratus}%`];
+                });
+
+                doc.autoTable({
+                    startY: 48,
+                    head: [['Bil', 'Nama Murid', 'Kelas', 'Guru Pembimbing', 'Penguasaan']],
+                    body: tableRows,
+                    theme: 'grid',
+                    headStyles: { fillStyle: [5, 150, 105] }
+                });
+
+                doc.save('Laporan_QMurajaah_Keseluruhan_Sekolah.pdf');
+            }
+            showToast('Laporan PDF berjaya dijana dan dimuat turun.', 'success');
+        }
+
+        // ==========================================
+        // 6. RECORDING & VERIFICATION HANDLERS
+        // ==========================================
+
+        function submitBacaanBaru(e) {
+            e.preventDefault();
+            const anakId = document.getElementById('input-bacaan-anak').value || 'M001';
+            const anak = dbMurid.find(m => m.id === anakId);
+
+            const newRecord = {
+                id: 'R' + Math.floor(1000 + Math.random() * 9000),
+                id_murid: anakId,
+                nama_murid: anak.nama,
+                kategori: document.getElementById('input-bacaan-kategori').value,
+                muka_surat: document.getElementById('input-bacaan-muka').value,
+                tarikh: document.getElementById('input-bacaan-tarikh').value,
+                status: 'Menunggu Pengesahan',
+                tahap: '-',
+                komen_guru: '',
+                tarikh_hantar: new Date().toISOString().split('T')[0],
+                catatan_ibubapa: document.getElementById('input-bacaan-catatan').value
+            };
+
+            dbRekod.push(newRecord);
+            saveToStorage();
+            closeModal('modal-hantar-bacaan');
+            showToast('Rekod bacaan berjaya dihantar kepada guru untuk semakan.', 'success');
+            renderViewport();
+        }
+
+        function openPengesahanModal(recordId) {
+            const record = dbRekod.find(r => r.id === recordId);
+            if (!record) return;
+
+            document.getElementById('verify-record-id').value = record.id;
+            document.getElementById('detail-bacaan-to-verify').innerHTML = `
+                <p><strong>Nama Murid:</strong> ${record.nama_murid}</p>
+                <p><strong>Kategori & M/S:</strong> ${record.kategori} (${record.muka_surat})</p>
+                <p><strong>Tarikh Bacaan:</strong> ${record.tarikh}</p>
+                <p class="italic text-slate-500"><strong>Catatan Ibu Bapa:</strong> ${record.catatan_ibubapa || 'Tiada'}</p>
+            `;
+            openModal('modal-pengesahan-guru');
+        }
+
+        function simpanPengesahanGuru(e) {
+            e.preventDefault();
+            const recordId = document.getElementById('verify-record-id').value;
+            const record = dbRekod.find(r => r.id === recordId);
+
+            if (record) {
+                record.tahap = document.querySelector('input[name="tahap_penguasaan"]:checked').value;
+                record.status = document.getElementById('verify-status').value;
+                record.komen_guru = document.getElementById('verify-komen').value;
+
+                saveToStorage();
+                closeModal('modal-pengesahan-guru');
+                showToast('Pengesahan rekod bacaan telah disimpan.', 'success');
+                renderViewport();
+            }
+        }
+
+        // ==========================================
+        // 7. CHART ENGINE (CHART.JS)
+        // ==========================================
+
+        function initAdminCharts() {
+            setTimeout(() => {
+                const ctxBar = document.getElementById('chart-penguasaan-kelas');
+                if (ctxBar) {
+                    new Chart(ctxBar, {
+                        type: 'bar',
+                        data: {
+                            labels: ['2 BESTARI', '2 CEKAL', '2 DEDIKASI'],
+                            datasets: [{
+                                label: 'Purata Penguasaan (%)',
+                                data: [78, 65, 70],
+                                backgroundColor: '#10b981',
+                                borderRadius: 8
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
+                }
+
+                const ctxPie = document.getElementById('chart-pie-tahap');
+                if (ctxPie) {
+                    new Chart(ctxPie, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['LANCAR', 'KURANG LANCAR'],
+                            datasets: [{
+                                data: [
+                                    dbRekod.filter(r => r.tahap === 'LANCAR').length,
+                                    dbRekod.filter(r => r.tahap === 'KURANG LANCAR').length
+                                ],
+                                backgroundColor: ['#059669', '#f59e0b']
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
+                }
+            }, 100);
+        }
+
+        function initGuruCharts() {
+            // Placeholder chart logic for guru view if needed
+        }
+
+        // ==========================================
+        // 8. UTILITY & MODAL HELPER FUNCTIONS
+        // ==========================================
+
+        function openModal(id) {
+            if (id === 'modal-hantar-bacaan') {
+                const selectAnak = document.getElementById('input-bacaan-anak');
+                selectAnak.innerHTML = dbMurid.map(m => `<option value="${m.id}">${m.nama} (${m.kelas})</option>`).join('');
+                document.getElementById('input-bacaan-tarikh').value = new Date().toISOString().split('T')[0];
+            }
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function showToast(msg, type = 'info') {
+            const banner = document.getElementById('toast-banner');
+            const msgEl = document.getElementById('toast-message');
+            msgEl.innerText = msg;
+
+            if (type === 'success') {
+                banner.className = 'mb-4 p-4 rounded-xl shadow-sm text-sm font-medium flex items-center justify-between transition-all duration-300 bg-emerald-100 text-emerald-800 border border-emerald-200';
+            } else if (type === 'error') {
+                banner.className = 'mb-4 p-4 rounded-xl shadow-sm text-sm font-medium flex items-center justify-between transition-all duration-300 bg-red-100 text-red-800 border border-red-200';
+            } else {
+                banner.className = 'mb-4 p-4 rounded-xl shadow-sm text-sm font-medium flex items-center justify-between transition-all duration-300 bg-blue-100 text-blue-800 border border-blue-200';
+            }
+
+            banner.classList.remove('hidden');
+            setTimeout(() => hideToast(), 4000);
+        }
+
+        function hideToast() {
+            document.getElementById('toast-banner').classList.add('hidden');
+        }
+
+        function saveSupabaseConfig() {
+            showToast('Konfigurasi Supabase telah berjaya disimpan.', 'success');
+            closeModal('config-modal');
+        }
+
+        // Initialization on Load
+        window.onload = function() {
+            saveToStorage();
+            renderViewport();
+        };
+    </script>
+</body>
+</html>
